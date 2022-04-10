@@ -81,6 +81,8 @@ def working_for_client(client_server, client_addr, timeout_var, index):
         print(f"Thread {client_addr}: Success: served file {file_name} \n")
         client_server.close()
 
+
+
     except FileNotFoundError:
         header_1 = errmsg
         print(f'Thread {client_addr}: Error: invalid path \n')
