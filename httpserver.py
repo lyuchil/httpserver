@@ -31,8 +31,6 @@ def working_for_client(client_server, client_addr, timeout_var, index):
         client_server.close()
         sys.exit(1)
 
-        
-
     parse = HTTP_request.split(" ")
     file_name_temp = parse[1]
     file_name = file_name_temp.lstrip("/")
