@@ -88,7 +88,6 @@ def working_for_client(client_server, client_addr, timeout_var):
         client_server.close()
         sys.exit(1)
 
-
 # ----- main ------
 
 # local host value
@@ -143,6 +142,3 @@ while True:
         for threads in total_threads:
             if not threads.is_alive():
                 total_threads.remove(threads)
-
-
-
