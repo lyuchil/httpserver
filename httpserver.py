@@ -3,6 +3,7 @@ import sys
 import time
 import threading
 
+# messages used in the server
 errmsg = 'HTTP/1.1 404 NOT FOUND\r\n\r\n'
 response10 = 'HTTP/1.0 200 OK\r\n\r\n'
 response11 = 'HTTP/1.1 200 OK\r\n\r\n'
