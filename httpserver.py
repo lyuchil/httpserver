@@ -38,13 +38,12 @@ def working_for_client(client_server, client_addr, timeout_var):
     # catching timeout error when there is no data coming through
     try:
         HTTP_request = client_server.recv(1024).decode()
-    except TimeoutError:
+    except socket.timeout:
         header_1 = errmsg
         thread_print(client_addr, timeout_message, "")
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
-        sys.exit(1)
 
     # parsing the HTTP request and extracting the file name and HTTP version
     parse = HTTP_request.split(" ")
@@ -61,7 +60,7 @@ def working_for_client(client_server, client_addr, timeout_var):
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
-        sys.exit(1)
+
 
 # checking for the custom header that puts additional wait on the request
     if 'X-Additional-wait' in HTTP_request:
@@ -83,7 +82,6 @@ def working_for_client(client_server, client_addr, timeout_var):
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
-        sys.exit(1)
 
 # trying to retrieve file
     if file_name == '':
@@ -99,7 +97,6 @@ def working_for_client(client_server, client_addr, timeout_var):
         client_server.send(response_1)
         thread_print(client_addr, success_message, file_name2)
         client_server.close()
-        sys.exit(1)
 # sending 404 Error when the file name does not exist
     except FileNotFoundError:
         header_1 = errmsg
@@ -107,7 +104,6 @@ def working_for_client(client_server, client_addr, timeout_var):
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
-        sys.exit(1)
 
 # ----- main ------
 
@@ -142,7 +138,12 @@ total_threads = []
 
 
 while True:
-    client_server, client_addr = server_socket.accept()
+    try:
+        client_server, client_addr = server_socket.accept()
+    except KeyboardInterrupt:
+        print("Applicaition ended")
+        server_socket.close()
+        sys.exit(1)
 
     # checking for maximum request by the number of threads
     if len(total_threads) == max_rq:
@@ -158,6 +159,8 @@ while True:
         t = threading.Thread(target=working_for_client, args=(client_server, client_addr, timeout))
         t.start()
         total_threads.append(t)
+
+        t.join()
 
 # making sure that when the thread ends, it is removed from the list of threads and open up spot for new requests
         for threads in total_threads:
