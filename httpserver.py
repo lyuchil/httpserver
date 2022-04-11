@@ -7,6 +7,26 @@ errmsg = 'HTTP/1.1 404 NOT FOUND\r\n\r\n'
 response10 = 'HTTP/1.0 200 OK\r\n\r\n'
 response11 = 'HTTP/1.1 200 OK\r\n\r\n'
 
+timeout_message = "Error: socket recv timed out"
+invalid_request_message = "Error: invalid request line"
+additional_wait_message = "Additional wait: "
+invalid_path_message = "Error: invalid path"
+success_message = "Success: served file "
+
+# lock to ensure thread safety
+lock = threading.Lock()
+
+
+# print function designed to enable thread safety
+def thread_print(label, message, name):
+    with lock:
+        thread_message = f"Thread {label}: "
+        thread_message += message
+        thread_message += name
+        thread_message += "\n"
+        print(thread_message)
+
+
 # function that handles individual request
 def working_for_client(client_server, client_addr, timeout_var):
     print(f"Thread {client_addr} created \n")
@@ -20,7 +40,7 @@ def working_for_client(client_server, client_addr, timeout_var):
         HTTP_request = client_server.recv(1024).decode()
     except TimeoutError:
         header_1 = errmsg
-        print(f"Thread {client_addr}: Error: socket recv timed out \n")
+        thread_print(client_addr, timeout_message, "")
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
@@ -30,27 +50,28 @@ def working_for_client(client_server, client_addr, timeout_var):
     parse = HTTP_request.split(" ")
     file_name_temp = parse[1]
     file_name = file_name_temp.lstrip("/")
+    file_name2 = file_name_temp.lstrip("/")
     parse2 = parse[2].split('\r\n')
     HTTP_version = parse2[0]
-
-    # checking for the custom header that puts additional wait on the request
-    if 'X-Additional-wait' in HTTP_request:
-        custom_parse = HTTP_request.split()
-        sleep_index = custom_parse.index('X-Additional-wait:')
-        sleep_time = int(custom_parse[sleep_index + 1])
-        print(f"Thread {client_addr}: Additional wait: {sleep_time} \n")
-        time.sleep(sleep_time)
 
     # checking for the correct request type sent by the HTTP request
     if parse[0] != "GET":
         header_1 = errmsg
-        print(f"Thread {client_addr}: Error: invalid request line \n")
+        thread_print(client_addr, invalid_request_message, "")
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
         sys.exit(1)
 
-    # checking for the correct HTTP version and setting the correct header
+# checking for the custom header that puts additional wait on the request
+    if 'X-Additional-wait' in HTTP_request:
+        custom_parse = HTTP_request.split()
+        sleep_index = custom_parse.index('X-Additional-wait:')
+        sleep_time = int(custom_parse[sleep_index + 1])
+        thread_print(client_addr, additional_wait_message, str(sleep_time))
+        time.sleep(sleep_time)
+
+# checking for the correct HTTP version and setting the correct header
     try:
         if HTTP_version == "HTTP/1.1":
             header_1 = response11
@@ -58,13 +79,13 @@ def working_for_client(client_server, client_addr, timeout_var):
             header_1 = response10
     except Exception:
         header_1 = errmsg
-        print(f"Thread {client_addr}: Error: invalid request line \n")
+        thread_print(client_addr, invalid_request_message, "")
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
         sys.exit(1)
 
-    # trying to retrieve file
+# trying to retrieve file
     if file_name == '':
         file_name = 'index.html'
 
@@ -76,13 +97,13 @@ def working_for_client(client_server, client_addr, timeout_var):
         response_1 = header_1.encode()
         response_1 += requested_file
         client_server.send(response_1)
-        print(f"Thread {client_addr}: Success: served file {file_name} \n")
+        thread_print(client_addr, success_message, file_name2)
         client_server.close()
         sys.exit(1)
-    # sending 404 Error when the file name does not exist
+# sending 404 Error when the file name does not exist
     except FileNotFoundError:
         header_1 = errmsg
-        print(f'Thread {client_addr}: Error: invalid path \n')
+        thread_print(client_addr, invalid_path_message, "")
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
@@ -116,10 +137,11 @@ server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((host, port))
 server_socket.listen(max_rq)
 
+# list of active threads
 total_threads = []
 
-while True:
 
+while True:
     client_server, client_addr = server_socket.accept()
 
     # checking for maximum request by the number of threads
@@ -130,15 +152,14 @@ while True:
         client_server.send(response)
         client_server.close()
     else:
-
         print(f'Information: received new connection from {client_addr}, port {port}')
 
-        # creating threads when receiving request
+# creating threads when receiving request
         t = threading.Thread(target=working_for_client, args=(client_server, client_addr, timeout))
         t.start()
         total_threads.append(t)
 
-        # making sure that when the thread ends, it is removed from the list of threads and open up spot for new requests
+# making sure that when the thread ends, it is removed from the list of threads and open up spot for new requests
         for threads in total_threads:
             if not threads.is_alive():
                 total_threads.remove(threads)
