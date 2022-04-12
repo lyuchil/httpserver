@@ -14,6 +14,8 @@ additional_wait_message = "Additional wait: "
 invalid_path_message = "Error: invalid path"
 success_message = "Success: served file "
 
+# HTTP_request = ""
+
 # lock to ensure thread safety
 lock = threading.Lock()
 
@@ -31,7 +33,7 @@ def thread_print(label, message, name):
 # function that handles individual request
 def working_for_client(client_server, client_addr, timeout_var):
     print(f"Thread {client_addr} created \n")
-
+    # global HTTP_request
     # setting the timeout variable based on the command line
     client_server.settimeout(timeout_var)
     header_1 = ""
@@ -45,6 +47,7 @@ def working_for_client(client_server, client_addr, timeout_var):
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
+        sys.exit(1)
 
     # parsing the HTTP request and extracting the file name and HTTP version
     parse = HTTP_request.split(" ")
@@ -61,9 +64,9 @@ def working_for_client(client_server, client_addr, timeout_var):
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
+        sys.exit(1)
 
-
-# checking for the custom header that puts additional wait on the request
+    # checking for the custom header that puts additional wait on the request
     if 'X-Additional-wait' in HTTP_request:
         custom_parse = HTTP_request.split()
         sleep_index = custom_parse.index('X-Additional-wait:')
@@ -71,7 +74,7 @@ def working_for_client(client_server, client_addr, timeout_var):
         thread_print(client_addr, additional_wait_message, str(sleep_time))
         time.sleep(sleep_time)
 
-# checking for the correct HTTP version and setting the correct header
+    # checking for the correct HTTP version and setting the correct header
     try:
         if HTTP_version == "HTTP/1.1":
             header_1 = response11
@@ -83,8 +86,9 @@ def working_for_client(client_server, client_addr, timeout_var):
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
+        sys.exit(1)
 
-# trying to retrieve file
+    # trying to retrieve file
     if file_name == '':
         file_name = 'index.html'
 
@@ -98,13 +102,16 @@ def working_for_client(client_server, client_addr, timeout_var):
         client_server.send(response_1)
         thread_print(client_addr, success_message, file_name2)
         client_server.close()
-# sending 404 Error when the file name does not exist
+        sys.exit(1)
+    # sending 404 Error when the file name does not exist
     except FileNotFoundError:
         header_1 = errmsg
         thread_print(client_addr, invalid_path_message, "")
         response_1 = header_1.encode()
         client_server.send(response_1)
         client_server.close()
+        sys.exit(1)
+
 
 # ----- main ------
 
@@ -137,7 +144,6 @@ server_socket.listen(max_rq)
 # list of active threads
 total_threads = []
 
-
 while True:
     try:
         client_server, client_addr = server_socket.accept()
@@ -156,14 +162,13 @@ while True:
     else:
         print(f'Information: received new connection from {client_addr}, port {port}')
 
-# creating threads when receiving request
+        # creating threads when receiving request
         t = threading.Thread(target=working_for_client, args=(client_server, client_addr, timeout))
-        t.start()
         total_threads.append(t)
 
-        t.join()
+        # making sure that when the thread ends, it is removed from the list of threads and open up spot for new requests
+        for thread in total_threads:
+            t.start()
 
-# making sure that when the thread ends, it is removed from the list of threads and open up spot for new requests
         for threads in total_threads:
-            if not threads.is_alive():
-                total_threads.remove(threads)
+            total_threads.remove(threads)
